@@ -85,12 +85,72 @@ ha-ws search <entity_id>               # Find related entities
 ha-ws raw <msg_type> [json]             # Send any WS message
 ```
 
+### Label Registry
+
+```
+ha-ws label list                        # All labels
+ha-ws label create <name> [color=X icon=X description=X]
+ha-ws label update <label_id> key=value
+ha-ws label delete <label_id>
+ha-ws label assign <entity_id> <label_id> [label_id ...]  # Add labels to entity
+```
+
+### Floor Registry
+
+```
+ha-ws floor list                        # All floors
+ha-ws floor create <name> [level=X icon=X]
+ha-ws floor update <floor_id> key=value
+ha-ws floor delete <floor_id>
+```
+
+### Group Management
+
+```
+ha-ws group list                        # All groups with members
+ha-ws group get <group_entity_id>       # Group details
+ha-ws group create <object_id> name="Name" entities=a,b,c
+ha-ws group remove <object_id>
+```
+
+### Scene Management
+
+```
+ha-ws scene list                        # All scenes
+ha-ws scene get <scene_id>              # Scene config (via REST)
+ha-ws scene create <scene_id> <json_file>  # Create from JSON file
+ha-ws scene delete <scene_id>           # Delete scene
+ha-ws scene activate <scene_entity_id>  # Turn on scene
+ha-ws scene snapshot <entity_id> [...]  # Capture current states as JSON
+ha-ws scene reload                      # Reload scenes from config
+```
+
+### Config Entries (Integrations)
+
+```
+ha-ws entries list                      # All integrations with state
+ha-ws entries get <entry_id>            # Single integration details
+```
+
+### Health Audit
+
+```
+ha-ws audit summary                     # Overview: counts for all categories
+ha-ws audit unavailable                 # Entities with state "unavailable"
+ha-ws audit unknown                     # Entities with state "unknown"
+ha-ws audit disabled                    # Disabled entities
+ha-ws audit stale [hours]               # Not updated in N hours (default: 72)
+ha-ws audit orphaned                    # Entities with missing device/integration
+ha-ws audit dead-devices                # Devices where all entities are bad
+```
+
 ### Value Syntax for ha-ws
 
 - Strings: `name=Kitchen` or `name="Living Room"` (quote if spaces)
 - Numbers: `brightness=255`
 - Booleans: `hidden=true` / `hidden=false`
 - Null: `disabled_by=null`
+- Lists: `entities=light.one,light.two,light.three` (comma-separated)
 - JSON: Pass inline `'{"key": "value"}'`
 
 ## ha-dashboard (Dashboard Management)

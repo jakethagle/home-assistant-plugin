@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ha-api — Home Assistant REST API CLI
+# Usage: ha-api <command> [args...]
+
+HA_URL="${CLAUDE_PLUGIN_OPTION_HOME_ASSISTANT_URL:?Set Home Assistant URL in plugin config}"
+HA_TOKEN="${CLAUDE_PLUGIN_OPTION_HOME_ASSISTANT_TOKEN:?Set Home Assistant token in plugin config}"
+HA_URL="${HA_URL%/}"
+
+api_get() {
+  curl -sf -H "Authorization: Bearer $HA_TOKEN" \
+    -H "Content-Type: application/json" \
+    "$HA_URL/api$1"
+}
+
+api_post() {
+  local path="$1"
+  local data="${2:-{\}}"
+  curl -sf -H "Authorization: Bearer $HA_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "$data" \
+    "$HA_URL/api$1"
+}
+
+usage() {
+  cat <<'EOF'
+ha-api — Home Assistant REST API CLI
+
+Usage: ha-api <command> [args...]
+
+Commands:
+  states [filter]                  List all entity states (optional grep filter)
+  state <entity_id>                Get state of a single entity
+  domains                          List available service domains
+  devices                          List devices from the device registry
+  search <term>                    Search entities by name or ID
+  call <domain.service> [entity_id] [json]  Call a service
+  attr <entity_id>                 Get entity attributes
+  history <entity_id> [hours]      Get state history (default: 24h)
+  get <path>                       Raw GET to /api/<path>
+  post <path> [json]               Raw POST to /api/<path>
+EOF
+  exit 1
+}
+
+cmd_states() {
+  local filter="${1:-}"
+  if [[ -n "$filter" ]]; then
+    api_get "/states" | jq -r '.[] | "\(.entity_id)  \(.state)  \(.attributes.friendly_name // "")"' | grep -i "$filter"
+  else
+    api_get "/states" | jq -r '.[] | "\(.entity_id)  \(.state)  \(.attributes.friendly_name // "")"'
+  fi
+}
+
+cmd_state() {
+  local entity_id="${1:?Usage: ha-api state <entity_id>}"
+  api_get "/states/$entity_id" | jq .
+}
+
+cmd_domains() {
+  api_get "/services" | jq -r '.[].domain' | sort
+}
+
+cmd_devices() {
+  # Device registry is not directly in REST API, use config entries as proxy
+  api_get "/states" | jq -r '[.[] | .attributes.device_class // empty] | unique | .[]'
+  echo "---"
+  echo "Note: For full device registry, use ha-ws device list"
+}
+
+cmd_search() {
+  local term="${1:?Usage: ha-api search <term>}"
+  api_get "/states" | jq -r --arg t "$term" \
+    '.[] | select((.entity_id | ascii_downcase | contains($t | ascii_downcase)) or (.attributes.friendly_name // "" | ascii_downcase | contains($t | ascii_downcase))) | "\(.entity_id)  \(.state)  \(.attributes.friendly_name // "")"'
+}
+
+cmd_call() {
+  local service="${1:?Usage: ha-api call <domain.service> [entity_id] [json_data]}"
+  local domain="${service%%.*}"
+  local svc="${service#*.}"
+  shift
+
+  local data="{}"
+  if [[ $# -ge 1 ]]; then
+    # If it looks like JSON, use it directly; otherwise treat as entity_id
+    if [[ "$1" == "{"* ]]; then
+      data="$1"
+    else
+      local entity_id="$1"
+      shift
+      if [[ $# -ge 1 ]]; then
+        # Merge entity_id into provided JSON
+        data=$(echo "$1" | jq --arg eid "$entity_id" '. + {entity_id: $eid}')
+      else
+        data="{\"entity_id\": \"$entity_id\"}"
+      fi
+    fi
+  fi
+
+  curl -sf -X POST \
+    -H "Authorization: Bearer $HA_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "$data" \
+    "$HA_URL/api/services/$domain/$svc" | jq .
+}
+
+cmd_attr() {
+  local entity_id="${1:?Usage: ha-api attr <entity_id>}"
+  api_get "/states/$entity_id" | jq '.attributes'
+}
+
+cmd_history() {
+  local entity_id="${1:?Usage: ha-api history <entity_id> [hours]}"
+  local hours="${2:-24}"
+  local since
+  since=$(date -u -v-${hours}H +"%Y-%m-%dT%H:%M:%S" 2>/dev/null || date -u -d "${hours} hours ago" +"%Y-%m-%dT%H:%M:%S")
+  api_get "/history/period/$since?filter_entity_id=$entity_id" | jq '.[0] // [] | .[] | {last_changed, state}'
+}
+
+cmd_get() {
+  local path="${1:?Usage: ha-api get <path>}"
+  api_get "/$path" | jq .
+}
+
+cmd_post() {
+  local path="${1:?Usage: ha-api post <path> [json]}"
+  local data="${2:-{\}}"
+  api_post "/$path" "$data" | jq .
+}
+
+# --- Main ---
+
+case "${1:-}" in
+  states)  shift; cmd_states "$@" ;;
+  state)   shift; cmd_state "$@" ;;
+  domains) cmd_domains ;;
+  devices) cmd_devices ;;
+  search)  shift; cmd_search "$@" ;;
+  call)    shift; cmd_call "$@" ;;
+  attr)    shift; cmd_attr "$@" ;;
+  history) shift; cmd_history "$@" ;;
+  get)     shift; cmd_get "$@" ;;
+  post)    shift; cmd_post "$@" ;;
+  *)       usage ;;
+esac

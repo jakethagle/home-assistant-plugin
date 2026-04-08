@@ -14,7 +14,7 @@ metadata:
 
 # Home Assistant Control
 
-Manage the user's Home Assistant instance "Roy Rogers" (HA 2025.6.1, timezone America/Phoenix) through three CLI tools. All tools are at `~/home/ha-tools/bin/` and load credentials from `~/home/ha-tools/.env`.
+Manage the user's Home Assistant instance through three CLI tools bundled with this plugin. The tools (`ha-api`, `ha-ws`, `ha-dashboard`) are on PATH automatically and load credentials from the plugin configuration.
 
 ## Tool Selection
 
@@ -31,6 +31,9 @@ Pick the right tool for the job:
 | Service calls with named parameters | ha-ws | `ha-ws call <domain.service> entity_id=<id> key=value` |
 | List available services | ha-ws | `ha-ws services [domain]` |
 | Dashboard listing and export | ha-dashboard | `ha-dashboard list\|get\|export\|save` |
+| Label/floor/group/scene management | ha-ws | `ha-ws label\|floor\|group\|scene ...` |
+| Integration/config entry info | ha-ws | `ha-ws entries list\|get` |
+| Entity health audit | ha-ws | `ha-ws audit summary\|unavailable\|stale\|orphaned\|...` |
 
 Use `ha-api` for simple, fast operations (single REST call). Use `ha-ws` for registry lookups, batch operations, or when you need detailed attributes.
 
@@ -44,10 +47,6 @@ When the user says something like "turn on the kitchen lights":
 4. **Execute** — `ha-api call light.turn_on light.kitchen`
 
 For ambiguous names, search first and confirm with the user if multiple matches exist.
-
-## Known Areas
-
-Living Room, Kitchen, Bedroom, Office, Master Bedroom, Parlor, Outside (Backyard)
 
 ## Common Operations
 
@@ -116,6 +115,15 @@ ha-dashboard get control-panel             # specific dashboard
 ## Output Flags
 
 Append `--json` to any command for raw JSON (useful for parsing). Append `--quiet` for minimal output (just the value). Default output is human-readable.
+
+## Related Skills
+
+For specialized tasks, these skills provide deeper guidance:
+
+| Request Type | Skill | Examples |
+|-------------|-------|---------|
+| Entity organization, groups, scenes, labels, floors | `ha-entity-manager` | "Create a group of kitchen lights", "Set up a movie scene", "Label all battery devices" |
+| Health audit, cleanup, troubleshooting broken entities | `ha-health-audit` | "What's broken?", "Find stale devices", "Clean up orphaned entities" |
 
 ## Full CLI Reference
 

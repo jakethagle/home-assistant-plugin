@@ -1,9 +1,30 @@
 {
   "name": "home-assistant",
-  "version": "0.1.0",
-  "description": "Control and monitor a Home Assistant instance using natural language. Manage lights, check states, search entities, call services, and configure dashboards.",
+  "version": "1.0.0",
+  "description": "Control and monitor a Home Assistant instance using natural language through Claude Code.",
   "author": {
     "name": "Jake Hagle"
   },
-  "keywords": ["home-assistant", "smart-home", "iot", "automation"]
+  "license": "MIT",
+  "keywords": [
+    "home-assistant",
+    "smart-home",
+    "iot",
+    "automation",
+    "entity-management",
+    "health-audit",
+    "scenes",
+    "groups"
+  ],
+  "hooks": "./hooks.json",
+  "userConfig": {
+    "home_assistant_url": {
+      "description": "Home Assistant URL (e.g., http://homeassistant.local:8123)",
+      "sensitive": false
+    },
+    "home_assistant_token": {
+      "description": "Home Assistant long-lived access token (Profile > Security > Long-Lived Access Tokens)",
+      "sensitive": true
+    }
+  }
 }

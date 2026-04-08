@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+exec "${CLAUDE_PLUGIN_DATA}/venv/bin/python3" "${CLAUDE_PLUGIN_ROOT}/lib/ha-dashboard.py" "$@"
