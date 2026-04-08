@@ -14,7 +14,7 @@ metadata:
 
 # Home Assistant Control
 
-Manage the user's Home Assistant instance through three CLI tools bundled with this plugin. The tools (`ha-api`, `ha-ws`, `ha-dashboard`) are on PATH automatically and load credentials from the plugin configuration.
+Manage the user's Home Assistant instance through four CLI tools bundled with this plugin. The tools (`ha-api`, `ha-ws`, `ha-dashboard`, `ha-ssh`) are on PATH automatically and load credentials from the plugin configuration.
 
 ## Tool Selection
 
@@ -34,8 +34,13 @@ Pick the right tool for the job:
 | Label/floor/group/scene management | ha-ws | `ha-ws label\|floor\|group\|scene ...` |
 | Integration/config entry info | ha-ws | `ha-ws entries list\|get` |
 | Entity health audit | ha-ws | `ha-ws audit summary\|unavailable\|stale\|orphaned\|...` |
+| Config entry options/data | ha-ssh | `ha-ssh storage entry-options <id>` |
+| .storage file reading | ha-ssh | `ha-ssh storage read <key>` |
+| Full HA logs | ha-ssh | `ha-ssh logs core\|supervisor\|addon <slug> [lines]` |
+| YAML config files | ha-ssh | `ha-ssh config read [filename]` |
+| Supervisor operations | ha-ssh | `ha-ssh supervisor info\|addons\|restart` |
 
-Use `ha-api` for simple, fast operations (single REST call). Use `ha-ws` for registry lookups, batch operations, or when you need detailed attributes.
+Use `ha-api` for simple, fast operations (single REST call). Use `ha-ws` for registry lookups, batch operations, or when you need detailed attributes. Use `ha-ssh` when you need config entry options/data (hidden from the API), .storage files, full logs, or Supervisor API access.
 
 ## Interpreting Requests
 
@@ -124,6 +129,7 @@ For specialized tasks, these skills provide deeper guidance:
 |-------------|-------|---------|
 | Entity organization, groups, scenes, labels, floors | `ha-entity-manager` | "Create a group of kitchen lights", "Set up a movie scene", "Label all battery devices" |
 | Health audit, cleanup, troubleshooting broken entities | `ha-health-audit` | "What's broken?", "Find stale devices", "Clean up orphaned entities" |
+| Config reading, .storage access, logs, Supervisor API | `ha-ssh` | "Show HomeKit bridge entity filter", "Read full logs", "Restart HA" |
 
 ## Full CLI Reference
 

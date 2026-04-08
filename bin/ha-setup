@@ -15,19 +15,29 @@ Usage: ha-setup [options]
 Options:
   --url <url>       Home Assistant URL (e.g., https://homeassistant.local:8123)
   --token <token>   Long-lived access token
+  --ssh             Configure SSH access (for .storage, logs, Supervisor API)
+  --ssh-host <host> SSH hostname (default: derived from URL)
+  --ssh-port <port> SSH port (default: 22)
+  --ssh-user <user> SSH username (default: root)
+  --ssh-key <path>  Path to SSH private key
   --show            Show current configuration
   --help            Show this help
 
 Interactive mode (default):
-  ha-setup
+  ha-setup          Set up API credentials (+ optional SSH)
+  ha-setup --ssh    Set up SSH access only
 
 Non-interactive mode:
   ha-setup --url https://ha.example.com --token eyJhbGci...
+  ha-setup --ssh --ssh-host ha.example.com --ssh-key ~/.ssh/id_ed25519
 
 To create a long-lived access token:
   1. Open your Home Assistant instance
   2. Go to Profile → Security → Long-Lived Access Tokens
   3. Click "Create Token" and copy the value
+
+SSH access requires the SSH addon in Home Assistant:
+  Settings → Add-ons → Advanced SSH & Web Terminal → Install
 EOF
   exit 0
 }
@@ -37,8 +47,16 @@ show_config() {
     # shellcheck source=/dev/null
     source "$HA_CONFIG_FILE"
     echo "Config: $HA_CONFIG_FILE"
-    echo "URL:    ${HA_URL:-<not set>}"
-    echo "Token:  ${HA_TOKEN:+****${HA_TOKEN: -4}}"
+    echo ""
+    echo "API:"
+    echo "  URL:    ${HA_URL:-<not set>}"
+    echo "  Token:  ${HA_TOKEN:+****${HA_TOKEN: -4}}"
+    echo ""
+    echo "SSH:"
+    echo "  Host:   ${HA_SSH_HOST:-<not set>}"
+    echo "  Port:   ${HA_SSH_PORT:-22}"
+    echo "  User:   ${HA_SSH_USER:-root}"
+    echo "  Key:    ${HA_SSH_KEY:-<default>}"
   else
     echo "Not configured. Run: ha-setup"
     exit 1
@@ -60,12 +78,59 @@ test_connection() {
   fi
 }
 
+test_ssh_connection() {
+  local host="$1" port="$2" user="$3" key="$4"
+  local ssh_args=("ssh" "-o" "BatchMode=yes" "-o" "StrictHostKeyChecking=accept-new" "-o" "ConnectTimeout=10" "-p" "$port")
+  if [[ -n "$key" && -f "$(eval echo "$key")" ]]; then
+    ssh_args+=("-i" "$(eval echo "$key")")
+  fi
+  ssh_args+=("${user}@${host}" "echo 'SSH connection successful'")
+  if output=$("${ssh_args[@]}" 2>&1); then
+    echo "$output"
+    return 0
+  else
+    echo "SSH connection failed: $output" >&2
+    return 1
+  fi
+}
+
+ensure_ssh_key() {
+  local key_path="$HOME/.ssh/id_ed25519"
+  if [[ -f "$key_path" ]]; then
+    echo "Found existing SSH key: $key_path"
+    echo "$key_path"
+    return 0
+  fi
+  # Check for RSA key
+  if [[ -f "$HOME/.ssh/id_rsa" ]]; then
+    echo "Found existing SSH key: $HOME/.ssh/id_rsa"
+    echo "$HOME/.ssh/id_rsa"
+    return 0
+  fi
+  # No key found, offer to generate
+  echo "No SSH key found."
+  read -rp "Generate a new ed25519 key? [Y/n]: " gen
+  if [[ ! "$gen" =~ ^[Nn] ]]; then
+    mkdir -p "$HOME/.ssh"
+    ssh-keygen -t ed25519 -f "$key_path" -N "" -q
+    echo "Generated new SSH key: $key_path"
+    echo "$key_path"
+    return 0
+  fi
+  echo ""
+  return 1
+}
+
 save_config() {
-  local url="$1" token="$2"
+  local url="$1" token="$2" ssh_host="$3" ssh_port="$4" ssh_user="$5" ssh_key="$6"
   mkdir -p "$HA_CONFIG_DIR"
   cat > "$HA_CONFIG_FILE" <<EOF
 HA_URL=$url
 HA_TOKEN=$token
+HA_SSH_HOST=$ssh_host
+HA_SSH_PORT=$ssh_port
+HA_SSH_USER=$ssh_user
+HA_SSH_KEY=$ssh_key
 EOF
   chmod 600 "$HA_CONFIG_FILE"
   echo "Config saved to $HA_CONFIG_FILE"
@@ -74,15 +139,25 @@ EOF
 # Parse arguments
 URL=""
 TOKEN=""
+SSH_HOST=""
+SSH_PORT=""
+SSH_USER=""
+SSH_KEY=""
 SHOW=false
+SSH_ONLY=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --url)    URL="$2"; shift 2 ;;
-    --token)  TOKEN="$2"; shift 2 ;;
-    --show)   SHOW=true; shift ;;
-    --help)   usage ;;
-    *)        echo "Unknown option: $1" >&2; usage ;;
+    --url)       URL="$2"; shift 2 ;;
+    --token)     TOKEN="$2"; shift 2 ;;
+    --ssh)       SSH_ONLY=true; shift ;;
+    --ssh-host)  SSH_HOST="$2"; shift 2 ;;
+    --ssh-port)  SSH_PORT="$2"; shift 2 ;;
+    --ssh-user)  SSH_USER="$2"; shift 2 ;;
+    --ssh-key)   SSH_KEY="$2"; shift 2 ;;
+    --show)      SHOW=true; shift ;;
+    --help)      usage ;;
+    *)           echo "Unknown option: $1" >&2; usage ;;
   esac
 done
 
@@ -97,53 +172,150 @@ if [[ -f "$HA_CONFIG_FILE" ]]; then
   source "$HA_CONFIG_FILE"
   EXISTING_URL="${HA_URL:-}"
   EXISTING_TOKEN="${HA_TOKEN:-}"
+  EXISTING_SSH_HOST="${HA_SSH_HOST:-}"
+  EXISTING_SSH_PORT="${HA_SSH_PORT:-22}"
+  EXISTING_SSH_USER="${HA_SSH_USER:-root}"
+  EXISTING_SSH_KEY="${HA_SSH_KEY:-}"
 else
   EXISTING_URL=""
   EXISTING_TOKEN=""
+  EXISTING_SSH_HOST=""
+  EXISTING_SSH_PORT="22"
+  EXISTING_SSH_USER="root"
+  EXISTING_SSH_KEY=""
 fi
 
-# Interactive mode if URL or token not provided via flags
-if [[ -z "$URL" ]]; then
-  if [[ -n "$EXISTING_URL" ]]; then
-    read -rp "Home Assistant URL [$EXISTING_URL]: " URL
-    URL="${URL:-$EXISTING_URL}"
-  else
-    read -rp "Home Assistant URL: " URL
+# --- API Setup (skip if --ssh only) ---
+
+if ! $SSH_ONLY; then
+  if [[ -z "$URL" ]]; then
+    if [[ -n "$EXISTING_URL" ]]; then
+      read -rp "Home Assistant URL [$EXISTING_URL]: " URL
+      URL="${URL:-$EXISTING_URL}"
+    else
+      read -rp "Home Assistant URL: " URL
+    fi
   fi
-fi
 
-if [[ -z "$TOKEN" ]]; then
-  if [[ -n "$EXISTING_TOKEN" ]]; then
-    read -rsp "API Token [****${EXISTING_TOKEN: -4}]: " TOKEN
-    echo
-    TOKEN="${TOKEN:-$EXISTING_TOKEN}"
-  else
-    read -rsp "API Token: " TOKEN
-    echo
+  if [[ -z "$TOKEN" ]]; then
+    if [[ -n "$EXISTING_TOKEN" ]]; then
+      read -rsp "API Token [****${EXISTING_TOKEN: -4}]: " TOKEN
+      echo
+      TOKEN="${TOKEN:-$EXISTING_TOKEN}"
+    else
+      read -rsp "API Token: " TOKEN
+      echo
+    fi
   fi
-fi
 
-# Validate inputs
-if [[ -z "$URL" ]]; then
-  echo "Error: URL is required" >&2
-  exit 1
-fi
-if [[ -z "$TOKEN" ]]; then
-  echo "Error: Token is required" >&2
-  exit 1
-fi
-
-# Test and save
-echo "Testing connection to $URL..."
-if test_connection "$URL" "$TOKEN"; then
-  save_config "$URL" "$TOKEN"
-else
-  echo ""
-  read -rp "Save anyway? [y/N]: " confirm
-  if [[ "$confirm" =~ ^[Yy] ]]; then
-    save_config "$URL" "$TOKEN"
-  else
-    echo "Aborted."
+  if [[ -z "$URL" ]]; then
+    echo "Error: URL is required" >&2
     exit 1
   fi
+  if [[ -z "$TOKEN" ]]; then
+    echo "Error: Token is required" >&2
+    exit 1
+  fi
+
+  echo "Testing connection to $URL..."
+  if ! test_connection "$URL" "$TOKEN"; then
+    echo ""
+    read -rp "Save anyway? [y/N]: " confirm
+    if [[ ! "$confirm" =~ ^[Yy] ]]; then
+      echo "Aborted."
+      exit 1
+    fi
+  fi
+else
+  # SSH-only mode: keep existing API creds
+  URL="${EXISTING_URL}"
+  TOKEN="${EXISTING_TOKEN}"
 fi
+
+# --- SSH Setup ---
+
+# Use existing SSH host as default (don't derive from URL — SSH almost always
+# uses a LAN IP, not the external DNS name)
+DEFAULT_SSH_HOST="${EXISTING_SSH_HOST}"
+
+# Interactive SSH setup
+if [[ -z "$SSH_HOST" ]]; then
+  echo ""
+  echo "=== SSH Configuration ==="
+  echo "SSH access enables reading .storage files, full logs, and Supervisor API."
+  echo "Requires the Advanced SSH & Web Terminal addon in Home Assistant."
+  echo ""
+
+  # Check/generate SSH key
+  if [[ -z "$SSH_KEY" ]]; then
+    if key_path=$(ensure_ssh_key); then
+      SSH_KEY="$key_path"
+    else
+      echo "Skipping SSH setup (no key available)."
+      SSH_KEY="${EXISTING_SSH_KEY}"
+      SSH_HOST="${EXISTING_SSH_HOST}"
+      SSH_PORT="${EXISTING_SSH_PORT}"
+      SSH_USER="${EXISTING_SSH_USER}"
+      save_config "$URL" "$TOKEN" "$SSH_HOST" "$SSH_PORT" "$SSH_USER" "$SSH_KEY"
+      exit 0
+    fi
+  fi
+
+  # Show public key for the user to add to the addon
+  pub_key_file="$(eval echo "$SSH_KEY").pub"
+  if [[ -f "$pub_key_file" ]]; then
+    echo ""
+    echo "Add this public key to your SSH addon configuration:"
+    echo "  (Settings → Add-ons → Advanced SSH & Web Terminal → Configuration → Authorized Keys)"
+    echo ""
+    echo "  $(cat "$pub_key_file")"
+    echo ""
+    read -rp "Press Enter once you've added the key and restarted the addon..."
+  fi
+
+  # Prompt for SSH connection details
+  echo ""
+  echo "SSH host is usually the local/LAN IP of your Home Assistant server"
+  echo "(e.g., 192.168.1.x), NOT the external DNS name. Port 22 is typically"
+  echo "not exposed through routers, so SSH connects over your local network."
+  echo ""
+  if [[ -n "$DEFAULT_SSH_HOST" ]]; then
+    read -rp "SSH Host (LAN IP or hostname) [$DEFAULT_SSH_HOST]: " SSH_HOST
+    SSH_HOST="${SSH_HOST:-$DEFAULT_SSH_HOST}"
+  else
+    read -rp "SSH Host (LAN IP or hostname): " SSH_HOST
+  fi
+
+  read -rp "SSH Port [${EXISTING_SSH_PORT}]: " SSH_PORT
+  SSH_PORT="${SSH_PORT:-$EXISTING_SSH_PORT}"
+
+  read -rp "SSH User [${EXISTING_SSH_USER}]: " SSH_USER
+  SSH_USER="${SSH_USER:-$EXISTING_SSH_USER}"
+fi
+
+# Use defaults for any empty values
+SSH_HOST="${SSH_HOST:-$EXISTING_SSH_HOST}"
+SSH_PORT="${SSH_PORT:-$EXISTING_SSH_PORT}"
+SSH_USER="${SSH_USER:-$EXISTING_SSH_USER}"
+SSH_KEY="${SSH_KEY:-$EXISTING_SSH_KEY}"
+
+# Test SSH connection if host is configured
+if [[ -n "$SSH_HOST" ]]; then
+  echo ""
+  echo "Testing SSH connection to ${SSH_USER}@${SSH_HOST}:${SSH_PORT}..."
+  if test_ssh_connection "$SSH_HOST" "$SSH_PORT" "$SSH_USER" "$SSH_KEY"; then
+    echo "SSH configured successfully!"
+  else
+    echo ""
+    read -rp "Save SSH config anyway? [y/N]: " confirm
+    if [[ ! "$confirm" =~ ^[Yy] ]]; then
+      SSH_HOST="${EXISTING_SSH_HOST}"
+      SSH_PORT="${EXISTING_SSH_PORT}"
+      SSH_USER="${EXISTING_SSH_USER}"
+      SSH_KEY="${EXISTING_SSH_KEY}"
+    fi
+  fi
+fi
+
+# Save everything
+save_config "$URL" "$TOKEN" "$SSH_HOST" "$SSH_PORT" "$SSH_USER" "$SSH_KEY"

@@ -180,8 +180,67 @@ All tools support:
 - `--json`: Raw JSON output (useful for piping/parsing)
 - `--quiet`: Minimal output (just the value)
 
+## ha-ssh (SSH Access)
+
+Direct access to HA config files, .storage, logs, and Supervisor API via SSH.
+Requires the SSH addon in Home Assistant. Configure with `ha-setup --ssh`.
+
+### SSH Connectivity
+
+```
+ha-ssh test                             # Test connection + Supervisor API
+```
+
+### Storage (reads .storage/ files — the API gap)
+
+```
+ha-ssh storage list                     # List all .storage/ files
+ha-ssh storage read <key>               # Read a .storage file (e.g., core.config_entries)
+ha-ssh storage entries [domain]         # Config entries with FULL options + data
+ha-ssh storage entry-options <entry_id> # Single entry options + data
+```
+
+The `storage entries` and `storage entry-options` commands expose `options` and `data` fields that the WebSocket/REST APIs deliberately hide. This is the only way to read integration-specific config like HomeKit bridge entity filters.
+
+**Workflow:** Find entry IDs with `ha-ws entries list`, then read full options with `ha-ssh storage entry-options <entry_id>`.
+
+### Config Files
+
+```
+ha-ssh config list                      # List files in /config/
+ha-ssh config read [filename]           # Read a file (default: configuration.yaml)
+ha-ssh config validate                  # Validate HA config via Supervisor API
+```
+
+### Logs
+
+```
+ha-ssh logs core [lines]                # HA Core logs (default: 100)
+ha-ssh logs supervisor [lines]          # Supervisor logs
+ha-ssh logs addon <slug> [lines]        # Addon-specific logs
+ha-ssh logs host [lines]                # Host system logs
+```
+
+### Supervisor API
+
+```
+ha-ssh supervisor info                  # HA Core + Supervisor version info
+ha-ssh supervisor addons                # List installed addons with state
+ha-ssh supervisor addon-info <slug>     # Detailed addon info
+ha-ssh supervisor restart --confirm     # Restart HA Core
+ha-ssh supervisor addon-restart <slug> --confirm  # Restart an addon
+ha-ssh supervisor reload                # Reload HA Core config
+```
+
+### Raw Command Execution
+
+```
+ha-ssh exec <command>                   # Run any command on the HA server
+```
+
 ## Performance Notes
 
 - `ha-api` is faster for simple queries (single HTTP request)
 - `ha-ws` is more powerful for registry operations and batch work
 - `ha-dashboard` works fully remote — no local file sync needed
+- `ha-ssh` is for config/storage reading that the API cannot provide — slower (SSH overhead) but accesses everything

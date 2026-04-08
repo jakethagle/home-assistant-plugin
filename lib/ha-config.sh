@@ -22,3 +22,10 @@ fi
 
 HA_URL="${HA_URL%/}"
 export HA_URL HA_TOKEN
+
+# SSH config (optional — used by ha-ssh)
+HA_SSH_HOST="${HA_SSH_HOST:-}"
+HA_SSH_PORT="${HA_SSH_PORT:-22}"
+HA_SSH_USER="${HA_SSH_USER:-root}"
+HA_SSH_KEY="${HA_SSH_KEY:-}"
+export HA_SSH_HOST HA_SSH_PORT HA_SSH_USER HA_SSH_KEY

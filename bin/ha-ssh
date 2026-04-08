@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+PLUGIN_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+exec "$HOME/.config/ha-claude/venv/bin/python3" "$PLUGIN_ROOT/lib/ha-ssh.py" "$@"
