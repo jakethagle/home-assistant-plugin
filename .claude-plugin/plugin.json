@@ -1,0 +1,9 @@
+{
+  "name": "home-assistant",
+  "version": "0.1.0",
+  "description": "Control and monitor a Home Assistant instance using natural language. Manage lights, check states, search entities, call services, and configure dashboards.",
+  "author": {
+    "name": "Jake Hagle"
+  },
+  "keywords": ["home-assistant", "smart-home", "iot", "automation"]
+}
