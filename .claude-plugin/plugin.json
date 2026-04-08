@@ -6,6 +6,7 @@
     "name": "Jake Hagle"
   },
   "license": "MIT",
+  "repository": "https://github.com/jakethagle/home-assistant-plugin",
   "keywords": [
     "home-assistant",
     "smart-home",

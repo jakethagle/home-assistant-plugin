@@ -32,7 +32,7 @@ Turn lights on, check sensor values, manage dashboards, organize entities into g
 ## Installation
 
 ```bash
-claude plugin add jakehagle/home-assistant-plugin
+claude plugin add jakethagle/home-assistant-plugin
 ```
 
 Or for local development:
