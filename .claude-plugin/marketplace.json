@@ -1,0 +1,13 @@
+{
+  "name": "jakethagle-home-assistant",
+  "owner": {
+    "name": "Jake Hagle"
+  },
+  "plugins": [
+    {
+      "name": "home-assistant",
+      "source": "./",
+      "description": "Control and monitor Home Assistant with natural language"
+    }
+  ]
+}
