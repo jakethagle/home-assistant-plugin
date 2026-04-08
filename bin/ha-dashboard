@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
-exec "${CLAUDE_PLUGIN_DATA}/venv/bin/python3" "${CLAUDE_PLUGIN_ROOT}/lib/ha-dashboard.py" "$@"
+PLUGIN_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+exec "$HOME/.config/ha-claude/venv/bin/python3" "$PLUGIN_ROOT/lib/ha-dashboard.py" "$@"

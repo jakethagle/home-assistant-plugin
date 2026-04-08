@@ -12,11 +12,23 @@ import websockets
 
 
 def load_env():
-    """Load Home Assistant credentials from plugin config."""
-    url = os.environ.get("CLAUDE_PLUGIN_OPTION_HOME_ASSISTANT_URL")
-    token = os.environ.get("CLAUDE_PLUGIN_OPTION_HOME_ASSISTANT_TOKEN")
+    """Load Home Assistant credentials from config file or environment."""
+    config_file = os.path.join(os.path.expanduser("~"), ".config", "ha-claude", "config")
+    url = None
+    token = None
+    if os.path.isfile(config_file):
+        with open(config_file) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("HA_URL="):
+                    url = line[len("HA_URL="):]
+                elif line.startswith("HA_TOKEN="):
+                    token = line[len("HA_TOKEN="):]
+    # Plugin env vars override config file
+    url = os.environ.get("CLAUDE_PLUGIN_OPTION_home_assistant_url", url)
+    token = os.environ.get("CLAUDE_PLUGIN_OPTION_home_assistant_token", token)
     if not url or not token:
-        print("Error: Plugin not configured. Set Home Assistant URL and token in plugin settings.", file=sys.stderr)
+        print("Error: Home Assistant not configured. Run: ha-setup", file=sys.stderr)
         sys.exit(1)
     return url.rstrip("/"), token
 

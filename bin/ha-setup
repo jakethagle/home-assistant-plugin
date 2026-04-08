@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ha-setup — Configure Home Assistant credentials for Claude Code plugin
+
+HA_CONFIG_DIR="$HOME/.config/ha-claude"
+HA_CONFIG_FILE="$HA_CONFIG_DIR/config"
+
+usage() {
+  cat <<'EOF'
+ha-setup — Configure Home Assistant connection
+
+Usage: ha-setup [options]
+
+Options:
+  --url <url>       Home Assistant URL (e.g., https://homeassistant.local:8123)
+  --token <token>   Long-lived access token
+  --show            Show current configuration
+  --help            Show this help
+
+Interactive mode (default):
+  ha-setup
+
+Non-interactive mode:
+  ha-setup --url https://ha.example.com --token eyJhbGci...
+
+To create a long-lived access token:
+  1. Open your Home Assistant instance
+  2. Go to Profile → Security → Long-Lived Access Tokens
+  3. Click "Create Token" and copy the value
+EOF
+  exit 0
+}
+
+show_config() {
+  if [[ -f "$HA_CONFIG_FILE" ]]; then
+    # shellcheck source=/dev/null
+    source "$HA_CONFIG_FILE"
+    echo "Config: $HA_CONFIG_FILE"
+    echo "URL:    ${HA_URL:-<not set>}"
+    echo "Token:  ${HA_TOKEN:+****${HA_TOKEN: -4}}"
+  else
+    echo "Not configured. Run: ha-setup"
+    exit 1
+  fi
+}
+
+test_connection() {
+  local url="$1" token="$2"
+  local response
+  if response=$(curl -sf --max-time 10 \
+    -H "Authorization: Bearer $token" \
+    -H "Content-Type: application/json" \
+    "${url%/}/api/" 2>&1); then
+    echo "Connection successful!"
+    return 0
+  else
+    echo "Connection failed: $response" >&2
+    return 1
+  fi
+}
+
+save_config() {
+  local url="$1" token="$2"
+  mkdir -p "$HA_CONFIG_DIR"
+  cat > "$HA_CONFIG_FILE" <<EOF
+HA_URL=$url
+HA_TOKEN=$token
+EOF
+  chmod 600 "$HA_CONFIG_FILE"
+  echo "Config saved to $HA_CONFIG_FILE"
+}
+
+# Parse arguments
+URL=""
+TOKEN=""
+SHOW=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --url)    URL="$2"; shift 2 ;;
+    --token)  TOKEN="$2"; shift 2 ;;
+    --show)   SHOW=true; shift ;;
+    --help)   usage ;;
+    *)        echo "Unknown option: $1" >&2; usage ;;
+  esac
+done
+
+if $SHOW; then
+  show_config
+  exit 0
+fi
+
+# Load existing config as defaults
+if [[ -f "$HA_CONFIG_FILE" ]]; then
+  # shellcheck source=/dev/null
+  source "$HA_CONFIG_FILE"
+  EXISTING_URL="${HA_URL:-}"
+  EXISTING_TOKEN="${HA_TOKEN:-}"
+else
+  EXISTING_URL=""
+  EXISTING_TOKEN=""
+fi
+
+# Interactive mode if URL or token not provided via flags
+if [[ -z "$URL" ]]; then
+  if [[ -n "$EXISTING_URL" ]]; then
+    read -rp "Home Assistant URL [$EXISTING_URL]: " URL
+    URL="${URL:-$EXISTING_URL}"
+  else
+    read -rp "Home Assistant URL: " URL
+  fi
+fi
+
+if [[ -z "$TOKEN" ]]; then
+  if [[ -n "$EXISTING_TOKEN" ]]; then
+    read -rsp "API Token [****${EXISTING_TOKEN: -4}]: " TOKEN
+    echo
+    TOKEN="${TOKEN:-$EXISTING_TOKEN}"
+  else
+    read -rsp "API Token: " TOKEN
+    echo
+  fi
+fi
+
+# Validate inputs
+if [[ -z "$URL" ]]; then
+  echo "Error: URL is required" >&2
+  exit 1
+fi
+if [[ -z "$TOKEN" ]]; then
+  echo "Error: Token is required" >&2
+  exit 1
+fi
+
+# Test and save
+echo "Testing connection to $URL..."
+if test_connection "$URL" "$TOKEN"; then
+  save_config "$URL" "$TOKEN"
+else
+  echo ""
+  read -rp "Save anyway? [y/N]: " confirm
+  if [[ "$confirm" =~ ^[Yy] ]]; then
+    save_config "$URL" "$TOKEN"
+  else
+    echo "Aborted."
+    exit 1
+  fi
+fi

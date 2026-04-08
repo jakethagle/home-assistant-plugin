@@ -5,7 +5,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "diff -q \"${CLAUDE_PLUGIN_ROOT}/requirements.txt\" \"${CLAUDE_PLUGIN_DATA}/requirements.txt\" >/dev/null 2>&1 || (python3 -m venv \"${CLAUDE_PLUGIN_DATA}/venv\" && \"${CLAUDE_PLUGIN_DATA}/venv/bin/pip\" install -q -r \"${CLAUDE_PLUGIN_ROOT}/requirements.txt\" && cp \"${CLAUDE_PLUGIN_ROOT}/requirements.txt\" \"${CLAUDE_PLUGIN_DATA}/requirements.txt\") || rm -f \"${CLAUDE_PLUGIN_DATA}/requirements.txt\""
+            "command": "diff -q \"${CLAUDE_PLUGIN_ROOT}/requirements.txt\" \"$HOME/.config/ha-claude/requirements.txt\" >/dev/null 2>&1 || (python3 -m venv \"$HOME/.config/ha-claude/venv\" && \"$HOME/.config/ha-claude/venv/bin/pip\" install -q -r \"${CLAUDE_PLUGIN_ROOT}/requirements.txt\" && cp \"${CLAUDE_PLUGIN_ROOT}/requirements.txt\" \"$HOME/.config/ha-claude/requirements.txt\") || rm -f \"$HOME/.config/ha-claude/requirements.txt\""
+          },
+          {
+            "type": "command",
+            "command": "test -f \"$HOME/.config/ha-claude/config\" || echo 'Home Assistant not configured. Run: ha-setup'"
           }
         ]
       }

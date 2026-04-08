@@ -4,9 +4,9 @@ set -euo pipefail
 # ha-api — Home Assistant REST API CLI
 # Usage: ha-api <command> [args...]
 
-HA_URL="${CLAUDE_PLUGIN_OPTION_HOME_ASSISTANT_URL:?Set Home Assistant URL in plugin config}"
-HA_TOKEN="${CLAUDE_PLUGIN_OPTION_HOME_ASSISTANT_TOKEN:?Set Home Assistant token in plugin config}"
-HA_URL="${HA_URL%/}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=../lib/ha-config.sh
+source "$SCRIPT_DIR/../lib/ha-config.sh"
 
 api_get() {
   curl -sf -H "Authorization: Bearer $HA_TOKEN" \
