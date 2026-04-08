@@ -20,11 +20,15 @@
   "hooks": "./hooks.json",
   "userConfig": {
     "home_assistant_url": {
-      "description": "Home Assistant URL (e.g., http://homeassistant.local:8123)",
+      "title": "Home Assistant URL",
+      "description": "Your Home Assistant instance URL (e.g., http://homeassistant.local:8123)",
+      "type": "string",
       "sensitive": false
     },
     "home_assistant_token": {
-      "description": "Home Assistant long-lived access token (Profile > Security > Long-Lived Access Tokens)",
+      "title": "Home Assistant Token",
+      "description": "Long-lived access token (Profile > Security > Long-Lived Access Tokens)",
+      "type": "string",
       "sensitive": true
     }
   }
