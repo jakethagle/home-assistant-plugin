@@ -130,6 +130,32 @@ class HASSHClient:
             return output
 
 
+# --- Helpers ---
+
+
+def _parse_option_value(s):
+    """Parse a string value into appropriate Python type for addon options."""
+    if s.lower() == "true":
+        return True
+    if s.lower() == "false":
+        return False
+    if s.lower() in ("null", "none"):
+        return None
+    try:
+        return json.loads(s)
+    except (json.JSONDecodeError, ValueError):
+        pass
+    try:
+        return int(s)
+    except ValueError:
+        pass
+    try:
+        return float(s)
+    except ValueError:
+        pass
+    return s
+
+
 # --- Commands ---
 
 
@@ -291,7 +317,7 @@ def cmd_config(ssh, args, opts):
 def cmd_logs(ssh, args, opts):
     """Access HA logs via Supervisor API."""
     sub = args[0] if args else "core"
-    lines = int(args[1]) if len(args) > 1 else 100
+    lines = 100
 
     endpoint_map = {
         "core": "core/logs",
@@ -307,6 +333,7 @@ def cmd_logs(ssh, args, opts):
         lines = int(args[2]) if len(args) > 2 else 100
         endpoint = f"addons/{slug}/logs"
     elif sub in endpoint_map:
+        lines = int(args[1]) if len(args) > 1 else 100
         endpoint = endpoint_map[sub]
     else:
         print(f"Unknown log source: {sub}", file=sys.stderr)
@@ -405,9 +432,27 @@ def cmd_supervisor(ssh, args, opts):
         else:
             print("Reload initiated.")
 
+    elif sub == "addon-options":
+        if len(args) < 3:
+            print("Usage: ha-ssh supervisor addon-options <slug> key=value [key=value ...]", file=sys.stderr)
+            return
+        slug = args[1]
+        options = {}
+        for arg in args[2:]:
+            if "=" not in arg:
+                print(f"Invalid option format: {arg} (expected key=value)", file=sys.stderr)
+                return
+            key, _, value = arg.partition("=")
+            options[key] = _parse_option_value(value)
+        result = ssh.supervisor_api("POST", f"addons/{slug}/options", {"options": options})
+        if opts["json"] and result:
+            print(json.dumps(result, indent=2))
+        else:
+            print(f"Options updated for addon: {slug}")
+
     else:
         print(f"Unknown supervisor subcommand: {sub}", file=sys.stderr)
-        print("Usage: ha-ssh supervisor info|addons|addon-info|restart|reload|addon-restart", file=sys.stderr)
+        print("Usage: ha-ssh supervisor info|addons|addon-info|addon-options|restart|reload|addon-restart", file=sys.stderr)
 
 
 def cmd_exec(ssh, args, opts):
@@ -465,6 +510,7 @@ Commands:
   supervisor addon-info <slug>            Addon details
   supervisor restart [--confirm]          Restart HA Core
   supervisor addon-restart <slug> [--confirm]  Restart an addon
+  supervisor addon-options <slug> key=val  Update addon config options
   supervisor reload                       Reload HA Core config
   exec <command>                          Run arbitrary SSH command
 

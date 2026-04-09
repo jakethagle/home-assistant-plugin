@@ -16,6 +16,8 @@ ha-api attr <entity_id>                 # Get attributes only
 ha-api history <entity_id> [hours]      # State history (default 24h)
 ha-api get <path>                       # Raw GET /api/<path>
 ha-api post <path> [json]               # Raw POST /api/<path>
+ha-api delete <path>                    # Raw DELETE /api/<path>
+ha-api delete-entry <entry_id>          # Delete a config entry
 ```
 
 ### Service Call Examples
@@ -130,6 +132,9 @@ ha-ws scene reload                      # Reload scenes from config
 ```
 ha-ws entries list                      # All integrations with state
 ha-ws entries get <entry_id>            # Single integration details
+ha-ws entries delete <entry_id>         # Delete integration (REST DELETE)
+ha-ws entries disable <entry_id>        # Disable integration
+ha-ws entries enable <entry_id>         # Re-enable integration
 ```
 
 ### Health Audit
@@ -229,6 +234,7 @@ ha-ssh supervisor addons                # List installed addons with state
 ha-ssh supervisor addon-info <slug>     # Detailed addon info
 ha-ssh supervisor restart --confirm     # Restart HA Core
 ha-ssh supervisor addon-restart <slug> --confirm  # Restart an addon
+ha-ssh supervisor addon-options <slug> key=val    # Update addon config options
 ha-ssh supervisor reload                # Reload HA Core config
 ```
 

@@ -33,12 +33,16 @@ Pick the right tool for the job:
 | Dashboard listing and export | ha-dashboard | `ha-dashboard list\|get\|export\|save` |
 | Label/floor/group/scene management | ha-ws | `ha-ws label\|floor\|group\|scene ...` |
 | Integration/config entry info | ha-ws | `ha-ws entries list\|get` |
+| Delete a config entry | ha-ws | `ha-ws entries delete <entry_id>` |
+| Disable/enable integration | ha-ws | `ha-ws entries disable\|enable <entry_id>` |
+| Delete config entry (REST) | ha-api | `ha-api delete-entry <entry_id>` |
 | Entity health audit | ha-ws | `ha-ws audit summary\|unavailable\|stale\|orphaned\|...` |
 | Config entry options/data | ha-ssh | `ha-ssh storage entry-options <id>` |
 | .storage file reading | ha-ssh | `ha-ssh storage read <key>` |
 | Full HA logs | ha-ssh | `ha-ssh logs core\|supervisor\|addon <slug> [lines]` |
 | YAML config files | ha-ssh | `ha-ssh config read [filename]` |
 | Supervisor operations | ha-ssh | `ha-ssh supervisor info\|addons\|restart` |
+| Update addon options | ha-ssh | `ha-ssh supervisor addon-options <slug> key=value` |
 
 Use `ha-api` for simple, fast operations (single REST call). Use `ha-ws` for registry lookups, batch operations, or when you need detailed attributes. Use `ha-ssh` when you need config entry options/data (hidden from the API), .storage files, full logs, or Supervisor API access.
 
@@ -99,6 +103,29 @@ ha-api history sensor.temperature_living_room 48  # 48h history
 ha-ws search light.kitchen                        # find related entities
 ha-ws info                                        # system info
 ```
+
+### Integration management
+
+```bash
+# List integrations with state
+ha-ws entries list
+
+# Disable a misbehaving integration
+ha-ws entries disable <entry_id>
+
+# Re-enable it
+ha-ws entries enable <entry_id>
+
+# Delete an integration entirely
+ha-ws entries delete <entry_id>
+
+# Update addon configuration
+ha-ssh supervisor addon-options <slug> key=value [key=value ...]
+```
+
+When switching integrations, new entities may get `_2` suffixes due to name collisions with old entities. To fix:
+1. Remove the old entity: `ha-ws entity remove <old_entity_id>`
+2. Rename the new one: `ha-ws entity update <entity_id_2> new_entity_id=<clean_id>`
 
 ### Dashboard management
 

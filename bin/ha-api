@@ -23,6 +23,12 @@ api_post() {
     "$HA_URL/api$1"
 }
 
+api_delete() {
+  curl -sf -X DELETE -H "Authorization: Bearer $HA_TOKEN" \
+    -H "Content-Type: application/json" \
+    "$HA_URL/api$1"
+}
+
 usage() {
   cat <<'EOF'
 ha-api — Home Assistant REST API CLI
@@ -40,16 +46,30 @@ Commands:
   history <entity_id> [hours]      Get state history (default: 24h)
   get <path>                       Raw GET to /api/<path>
   post <path> [json]               Raw POST to /api/<path>
+  delete <path>                    Raw DELETE to /api/<path>
+  delete-entry <entry_id>          Delete a config entry (integration)
+
+Options:
+  --json    Output raw JSON
+  --quiet   Minimal output
 EOF
   exit 1
 }
 
 cmd_states() {
   local filter="${1:-}"
-  if [[ -n "$filter" ]]; then
-    api_get "/states" | jq -r '.[] | "\(.entity_id)  \(.state)  \(.attributes.friendly_name // "")"' | grep -i "$filter"
+  if [[ "$JSON_MODE" -eq 1 ]]; then
+    if [[ -n "$filter" ]]; then
+      api_get "/states" | jq --arg f "$filter" '[.[] | select(.entity_id | test($f; "i"))]'
+    else
+      api_get "/states" | jq .
+    fi
   else
-    api_get "/states" | jq -r '.[] | "\(.entity_id)  \(.state)  \(.attributes.friendly_name // "")"'
+    if [[ -n "$filter" ]]; then
+      api_get "/states" | jq -r '.[] | "\(.entity_id)  \(.state)  \(.attributes.friendly_name // "")"' | grep -i "$filter"
+    else
+      api_get "/states" | jq -r '.[] | "\(.entity_id)  \(.state)  \(.attributes.friendly_name // "")"'
+    fi
   fi
 }
 
@@ -129,18 +149,43 @@ cmd_post() {
   api_post "/$path" "$data" | jq .
 }
 
+cmd_delete() {
+  local path="${1:?Usage: ha-api delete <path>}"
+  api_delete "/$path" | jq .
+}
+
+cmd_delete_entry() {
+  local entry_id="${1:?Usage: ha-api delete-entry <entry_id>}"
+  api_delete "/config/config_entries/entry/$entry_id" | jq .
+}
+
 # --- Main ---
 
+# Parse global flags
+JSON_MODE=0
+QUIET_MODE=0
+ARGS=()
+for arg in "$@"; do
+  case "$arg" in
+    --json)  JSON_MODE=1 ;;
+    --quiet) QUIET_MODE=1 ;;
+    *)       ARGS+=("$arg") ;;
+  esac
+done
+set -- "${ARGS[@]}"
+
 case "${1:-}" in
-  states)  shift; cmd_states "$@" ;;
-  state)   shift; cmd_state "$@" ;;
-  domains) cmd_domains ;;
-  devices) cmd_devices ;;
-  search)  shift; cmd_search "$@" ;;
-  call)    shift; cmd_call "$@" ;;
-  attr)    shift; cmd_attr "$@" ;;
-  history) shift; cmd_history "$@" ;;
-  get)     shift; cmd_get "$@" ;;
-  post)    shift; cmd_post "$@" ;;
-  *)       usage ;;
+  states)       shift; cmd_states "$@" ;;
+  state)        shift; cmd_state "$@" ;;
+  domains)      cmd_domains ;;
+  devices)      cmd_devices ;;
+  search)       shift; cmd_search "$@" ;;
+  call)         shift; cmd_call "$@" ;;
+  attr)         shift; cmd_attr "$@" ;;
+  history)      shift; cmd_history "$@" ;;
+  get)          shift; cmd_get "$@" ;;
+  post)         shift; cmd_post "$@" ;;
+  delete)       shift; cmd_delete "$@" ;;
+  delete-entry) shift; cmd_delete_entry "$@" ;;
+  *)            usage ;;
 esac

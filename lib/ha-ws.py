@@ -490,7 +490,7 @@ async def cmd_floor(ws, args, opts):
 
 
 async def cmd_entries(ws, args, opts):
-    """Config entry (integration) operations: list, get"""
+    """Config entry (integration) operations: list, get, delete, disable, enable"""
     sub = args[0] if args else "list"
 
     if sub == "list":
@@ -513,8 +513,42 @@ async def cmd_entries(ws, args, opts):
             print(json.dumps(matches[0], indent=2))
         else:
             print(f"Config entry not found: {entry_id}", file=sys.stderr)
+    elif sub == "delete":
+        entry_id = args[1] if len(args) > 1 else None
+        if not entry_id:
+            print("Usage: ha-ws entries delete <entry_id>", file=sys.stderr)
+            return
+        url, token = load_env()
+        try:
+            result = rest_request(url, token, "DELETE", f"config/config_entries/entry/{entry_id}")
+            print(f"Deleted config entry: {entry_id}")
+            if opts["json"] and result:
+                print(json.dumps(result, indent=2))
+        except RuntimeError as e:
+            print(f"Failed to delete config entry: {e}", file=sys.stderr)
+
+    elif sub == "disable":
+        entry_id = args[1] if len(args) > 1 else None
+        if not entry_id:
+            print("Usage: ha-ws entries disable <entry_id>", file=sys.stderr)
+            return
+        result = await ws.send("config_entries/disable", entry_id=entry_id, disabled_by="user")
+        print(f"Disabled config entry: {entry_id}")
+        if opts["json"] and result:
+            print(json.dumps(result, indent=2))
+
+    elif sub == "enable":
+        entry_id = args[1] if len(args) > 1 else None
+        if not entry_id:
+            print("Usage: ha-ws entries enable <entry_id>", file=sys.stderr)
+            return
+        result = await ws.send("config_entries/disable", entry_id=entry_id, disabled_by=None)
+        print(f"Enabled config entry: {entry_id}")
+        if opts["json"] and result:
+            print(json.dumps(result, indent=2))
+
     else:
-        print(f"Unknown entries subcommand: {sub}", file=sys.stderr)
+        print(f"Unknown entries subcommand: {sub}. Use: list|get|delete|disable|enable", file=sys.stderr)
 
 
 async def cmd_group(ws, args, opts):
@@ -915,7 +949,7 @@ Commands:
   floor list|create|update|delete  Floor registry operations
   group list|get|create|remove     Group management
   scene list|get|create|delete|activate|snapshot|reload  Scene management
-  entries list|get                 Config entries (integrations)
+  entries list|get|delete|disable|enable  Config entries (integrations)
   audit summary|unavailable|unknown|disabled|stale|orphaned|dead-devices
   state <entity_id>                Get entity state and attributes
   states [domain]                  List all states (optional domain filter)
